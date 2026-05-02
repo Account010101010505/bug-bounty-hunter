@@ -1,0 +1,41 @@
+name: Weekly Subdomain Discovery
+on:
+  schedule:
+    - cron: '0 1 * * 0'  # Every Sunday 1am UTC (after template update)
+  workflow_dispatch:
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Go tools
+        uses: actions/cache@v4
+        id: cache-tools
+        with:
+          path: ~/go/bin
+          key: go-tools-${{ runner.os }}-v1
+
+      - name: Install subfinder
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+
+      - name: Run subfinder on all domains
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          subfinder -dL domains.txt -silent -timeout 30 -t 10 -o subdomains_raw.txt || true
+          grep -vP '^\d+[-\.]\d+[-\.]\d+[-\.]\d+\.' subdomains_raw.txt > subdomains.txt || true
+          echo "Total subdomains found: $(wc -l < subdomains.txt)"
+
+      - name: Commit subdomains
+        run: |
+          git config --global user.email "bugbountybot@github.com"
+          git config --global user.name "BugBountyBot"
+          git add subdomains.txt
+          git diff --staged --quiet || git commit -m "Weekly subdomain update $(date +'%Y-%m-%d')"
+          git push
