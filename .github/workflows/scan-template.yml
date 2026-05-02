@@ -99,13 +99,13 @@ jobs:
       - name: Run subfinder
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          subfinder -dL batch_domains.txt -silent -timeout 30 -t 10 -o subs_raw.txt || true
+          subfinder -dL batch_domains.txt -silent -timeout 10 -t 10 -max-time 10 -o subs_raw.txt || true
           grep -vP '^\d+[-\.]\d+[-\.]\d+[-\.]\d+\.' subs_raw.txt > subs.txt || true
 
       - name: Run httpx
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          httpx -l subs.txt ${{ inputs.httpx_flags }} -timeout 10 -retries 1 -o live_hosts.txt || true
+          httpx -l subs.txt ${{ inputs.httpx_flags }} -timeout 5 -retries 0 -rl 100 -o live_hosts.txt || true
 
       - name: Run katana (if enabled)
         if: inputs.use_katana == true
