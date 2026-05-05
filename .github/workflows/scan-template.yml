@@ -111,7 +111,6 @@ jobs:
             TAGS_FLAG="-itags ${{ inputs.tags }}"
           fi
 
-          # Combine main templates and custom templates into one -t flag
           if [ -d "custom-templates" ]; then
             T_FLAG="-t $TEMPLATES_DIR -t custom-templates"
           else
@@ -123,8 +122,15 @@ jobs:
             $TAGS_FLAG \
             -severity ${{ inputs.severity }} \
             -silent -retries 1 -timeout 8 \
-            -bulk-size 25 -concurrency 30 \
+            -bulk-size 25 -concurrency 30 -max-host-error 30 \
             -o results.txt || true
+
+      - name: Show scan summary
+        if: always()
+        run: |
+          echo "=== ${{ inputs.scan_name }} RESULTS ==="
+          echo "Total findings: $(wc -l < results.txt 2>/dev/null || echo 0)"
+          cat results.txt 2>/dev/null || echo "No findings"
 
       - name: Check for results
         id: check
