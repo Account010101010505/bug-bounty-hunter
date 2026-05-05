@@ -71,13 +71,17 @@ jobs:
       - name: Ensure nuclei templates exist
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          if [ ! -d "$HOME/.local/share/nuclei-templates" ] || \
-             [ -z "$(ls -A $HOME/.local/share/nuclei-templates 2>/dev/null)" ]; then
+          echo "Nuclei location: $(which nuclei || echo 'NOT FOUND')"
+          echo "Go bin: $(ls ~/go/bin/)"
+          TEMPLATES_DIR="$HOME/.local/share/nuclei-templates"
+          if [ ! -d "$TEMPLATES_DIR" ] || [ -z "$(ls -A $TEMPLATES_DIR 2>/dev/null)" ]; then
             echo "No templates found, downloading now..."
-            nuclei -update-templates -silent
+            mkdir -p "$TEMPLATES_DIR"
+            nuclei -update-templates -ud "$TEMPLATES_DIR" -silent || true
+            nuclei -update-templates -silent || true
+            echo "Templates after download: $(ls $TEMPLATES_DIR 2>/dev/null | wc -l) folders"
           else
-            echo "Templates found, using cache"
-            ls $HOME/.local/share/nuclei-templates | head -5
+            echo "Templates found: $(ls $TEMPLATES_DIR | wc -l) folders"
           fi
 
       - name: Prepare input
