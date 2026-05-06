@@ -4,13 +4,9 @@ on:
     - cron: '0 2 * * *'
   workflow_dispatch:
 
-# Runs all daily scanners sequentially to avoid burning minutes in parallel
-# Order: fastest/highest value first
-
 jobs:
-
   # ─── 1. TAKEOVER ───────────────────────────────────────────────
-  # Uses 404 hosts only — pre-filtered by weekly recon
+  # Uses 404 hosts only — subdomains returning 404 are takeover candidates
   takeover:
     uses: ./.github/workflows/scan-template.yml
     with:
@@ -22,15 +18,16 @@ jobs:
       EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
       EMAIL_TO: ${{ secrets.EMAIL_TO }}
 
-  # ─── 2. CVE ────────────────────────────────────────────────────
-  # High/critical only to reduce noise
-  cve:
-    needs: takeover
+  # ─── 2. MAIN DAILY SCAN ────────────────────────────────────────
+  # CVE + CORS + Admin Panels + Secrets all in one nuclei run
+  # All use live_hosts so combining is clean and logical
+  daily_main:
     uses: ./.github/workflows/scan-template.yml
     with:
-      scan_name: "CVE"
-      tags: "cve"
-      severity: "high,critical"
+      scan_name: "Daily Main"
+      tags: "cve,cors,panel,admin,token,secret,api-key,exposure"
+      severity: "low,medium,high,critical"
+      input_file: "live_hosts"
     secrets:
       EMAIL_USER: ${{ secrets.EMAIL_USER }}
       EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
@@ -39,50 +36,11 @@ jobs:
   # ─── 3. 403 BYPASS ─────────────────────────────────────────────
   # Uses 403 hosts only — pre-filtered by weekly recon
   bypass_403:
-    needs: cve
     uses: ./.github/workflows/scan-template.yml
     with:
       scan_name: "403 Bypass"
       tags: "403"
       input_file: "live_hosts_403"
-    secrets:
-      EMAIL_USER: ${{ secrets.EMAIL_USER }}
-      EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-      EMAIL_TO: ${{ secrets.EMAIL_TO }}
-
-  # ─── 4. SECRETS ────────────────────────────────────────────────
-  # Uses katana to crawl URLs first then scan for exposed secrets
-  secrets:
-    needs: bypass_403
-    uses: ./.github/workflows/scan-template.yml
-    with:
-      scan_name: "Exposed Secrets"
-      tags: "token,secret,api-key,exposure"
-      use_katana: true
-    secrets:
-      EMAIL_USER: ${{ secrets.EMAIL_USER }}
-      EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-      EMAIL_TO: ${{ secrets.EMAIL_TO }}
-
-  # ─── 5. CORS ───────────────────────────────────────────────────
-  cors:
-    needs: secrets
-    uses: ./.github/workflows/scan-template.yml
-    with:
-      scan_name: "CORS Misconfiguration"
-      tags: "cors"
-    secrets:
-      EMAIL_USER: ${{ secrets.EMAIL_USER }}
-      EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-      EMAIL_TO: ${{ secrets.EMAIL_TO }}
-
-  # ─── 6. ADMIN PANELS ───────────────────────────────────────────
-  admin_panels:
-    needs: cors
-    uses: ./.github/workflows/scan-template.yml
-    with:
-      scan_name: "Admin Panels"
-      tags: "panel,admin"
     secrets:
       EMAIL_USER: ${{ secrets.EMAIL_USER }}
       EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
