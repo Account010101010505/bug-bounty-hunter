@@ -1,2 +1,1 @@
-https://error-reporting.zivver.com
-https://mta-sts.zivver.com
+https://auth.vinci.com
