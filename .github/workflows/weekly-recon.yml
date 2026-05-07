@@ -48,6 +48,7 @@ jobs:
         run: |
           go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
           go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest
+          go install github.com/PentestPad/subzy@latest
 
       - name: Download clean domains
         uses: actions/download-artifact@v4
@@ -103,11 +104,33 @@ jobs:
 
           echo "Batch ${{ matrix.batch }} total subdomains: $(wc -l < batch_subs.txt)"
 
+      - name: Run subzy on batch
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+
+          touch takeover_batch.txt
+
+          if [ -s batch_subs.txt ]; then
+            subzy run \
+              --targets batch_subs.txt \
+              --hide_fails \
+              --verify_ssl \
+              --timeout 10 \
+              --concurrency 50 \
+              > subzy_raw.txt 2>/dev/null || true
+
+            grep -i "vulnerable" subzy_raw.txt > takeover_batch.txt || true
+          fi
+
+          echo "Takeover candidates in batch ${{ matrix.batch }}: $(wc -l < takeover_batch.txt)"
+
       - name: Upload batch results
         uses: actions/upload-artifact@v4
         with:
           name: subs-batch-${{ matrix.batch }}
-          path: batch_subs.txt
+          path: |
+            batch_subs.txt
+            takeover_batch.txt
           if-no-files-found: warn
 
   combine_and_probe:
@@ -124,7 +147,6 @@ jobs:
       - name: Install tools
         run: |
           go install github.com/projectdiscovery/httpx/cmd/httpx@latest
-          go install github.com/PentestPad/subzy@latest
 
       - name: Download all subdomain artifacts
         uses: actions/download-artifact@v4
@@ -132,9 +154,9 @@ jobs:
           path: all_subs
           pattern: subs-batch-*
 
-      - name: Combine and deduplicate
+      - name: Combine and deduplicate subdomains
         run: |
-          find all_subs -name "*.txt" | xargs cat 2>/dev/null | \
+          find all_subs -name "batch_subs.txt" | xargs cat 2>/dev/null | \
             sort -u | \
             grep -v '^\*\.' | \
             grep -vE '^[0-9]{1,3}\.[0-9]' | \
@@ -142,9 +164,17 @@ jobs:
 
           echo "Total unique subdomains this week: $(wc -l < all_subdomains_new.txt)"
 
+      - name: Combine takeover results
+        run: |
+          find all_subs -name "takeover_batch.txt" | \
+            xargs cat 2>/dev/null | \
+            sort -u > takeover_candidates.txt || true
+
+          count=$(wc -l < takeover_candidates.txt)
+          echo "Total takeover candidates: $count"
+          echo "takeover_count=$count" >> $GITHUB_ENV
+
       # ── NEW ASSET DIFF ──────────────────────────────────────────
-      # Compare this week vs last week — new assets are hottest targets
-      # Developers just deployed them, likely unsecured
       - name: Diff new subdomains
         run: |
           if [ -f all_subdomains_clean.txt ] && [ -s all_subdomains_clean.txt ]; then
@@ -158,27 +188,6 @@ jobs:
 
           echo "New subdomains this week: $(wc -l < new_subdomains.txt)"
           cp all_subdomains_new.txt all_subdomains_clean.txt
-
-      # ── SUBZY: DNS-level takeover check on ALL subdomains ───────
-      # Runs before httpx — catches dangling CNAMEs httpx drops as dead
-      - name: Run subzy takeover check
-        run: |
-          export PATH=$PATH:$(go env GOPATH)/bin
-
-          subzy run \
-            --targets all_subdomains_clean.txt \
-            --hide_fails \
-            --verify_ssl \
-            --timeout 10 \
-            --concurrency 50 \
-            > subzy_raw.txt 2>/dev/null || true
-
-          touch takeover_candidates.txt
-          grep -i "vulnerable" subzy_raw.txt > takeover_candidates.txt || true
-
-          count=$(wc -l < takeover_candidates.txt)
-          echo "Takeover candidates found: $count"
-          echo "takeover_count=$count" >> $GITHUB_ENV
 
       # ── HTTPX: probe all subdomains ──────────────────────────────
       - name: Run httpx on all subdomains
@@ -215,7 +224,6 @@ jobs:
           echo "404 targets: $(wc -l < live_hosts_404.txt)"
 
       # ── HTTPX: probe new subdomains separately ───────────────────
-      # new_live_hosts.txt triggers the hot scan immediately after recon
       - name: Run httpx on new subdomains
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
