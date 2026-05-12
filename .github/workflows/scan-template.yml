@@ -129,6 +129,10 @@ jobs:
             -rl 10 \
             -concurrency 5 \
             -max-response-size 2000000 \
+            -H "User-Agent: Mozilla/5.0 BugBounty/42 (YWH) Chemical Oxidizer" \
+            -H "X-Bug-Bounty: HackerOne-potassium_permanganate, HackerOne-oxidizer" \
+            -H "X-Bugcrowd-Research: Chemical, Oxidizer" \
+            -H "X-Intigriti-Research: chemical, oxidizer" \
             -o urls.txt || true
           if [ -f urls.txt ]; then
             sort -u urls.txt | head -2000 > urls_capped.txt
@@ -173,6 +177,10 @@ jobs:
             $TAGS_FLAG \
             -etags ssl,tls,http-missing-headers,tech,info,dns,helpers,passive \
             -severity "$SEVERITY" \
+            -H "User-Agent: Mozilla/5.0 BugBounty/42 (YWH) Chemical Oxidizer" \
+            -H "X-Bug-Bounty: HackerOne-potassium_permanganate, HackerOne-oxidizer" \
+            -H "X-Bugcrowd-Research: Chemical, Oxidizer" \
+            -H "X-Intigriti-Research: chemical, oxidizer" \
             -silent \
             -retries 1 \
             -timeout 10 \
