@@ -78,7 +78,7 @@ jobs:
           subfinder -dL batch_domains.txt \
             -silent \
             -timeout 30 \
-            -t 10 \
+            -t 5 \
             -max-time 300 \
             -o subs_passive.txt || true
 
@@ -100,7 +100,7 @@ jobs:
               -w wordlist.txt \
               -silent \
               -resp-only \
-              -t 50 \
+              -t 20 \
               >> subs_active.txt || true
           done < batch_domains.txt
 
@@ -220,8 +220,8 @@ jobs:
             -silent \
             -timeout 8 \
             -retries 0 \
-            -rl 50 \
-            -threads 50 \
+            -rl 10 \
+            -threads 25 \
             -mc 200,201,301,302,303,401,403,404,405,500 \
             -title \
             -status-code \
@@ -256,7 +256,7 @@ jobs:
               -silent \
               -timeout 8 \
               -retries 0 \
-              -rl 50 \
+              -rl 10 \
               -threads 50 \
               -mc 200,201,301,302,303,401,403,404,405,500 \
               -status-code \
